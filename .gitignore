@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+.uv/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+*.egg
+MANIFEST
+.secrets.baseline

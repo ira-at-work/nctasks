@@ -1,0 +1,95 @@
+minimum_pre_commit_version: 1.18.1
+
+repos:
+  ##################################
+  # GENERAL CODE CLEANUP
+  ##################################
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-ast
+      - id: check-symlinks
+      - id: check-builtin-literals
+      - id: check-case-conflict
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=4096]
+      - id: debug-statements
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  ##################################
+  # PRE-COMMIT CONFIG VALIDATION
+  ##################################
+  - repo: https://github.com/pre-commit/pre-commit
+    rev: f35134b05028ec938ac605ae500fdf95462655d3  # frozen: v4.6.0
+    hooks:
+      - id: validate_manifest
+
+  - repo: meta
+    hooks:
+      - id: check-useless-excludes
+
+  ##################################
+  # PYTHON CODE QUALITY
+  ##################################
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 0c7b6c989466a93942def1f84baf36ddfcd60c83  # frozen: v0.15.14
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+        name: ruff-format-production
+        files: ^(?!.*test).*\.py$
+      - id: ruff-format
+        name: ruff-format-tests
+        files: (^|.*/)test.*\.py$|.*/tests/.*\.py$
+
+  ##################################
+  # SECURITY
+  ##################################
+  - repo: https://github.com/PyCQA/bandit
+    rev: 92ae8b82fb422a639f0ed8d99e96cea769594e08  # frozen: 1.9.4
+    hooks:
+      - id: bandit
+        files: ^src/
+        args: [--skip, "B110,B311"]
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: 01886c8a910c64595c47f186ca1ffc0b77fa5458  # frozen: v1.5.0
+    hooks:
+      - id: detect-secrets
+        exclude: '(^|.*/)test.*\.py$|.*/tests/.*\.py$|\.secrets\.baseline$|\.pre-commit-config\.yaml$'
+
+  ##################################
+  # MARKDOWN
+  ##################################
+  - repo: https://github.com/rvben/rumdl-pre-commit
+    rev: 2b042d15c2741709b823f1fa61a4914e0ae7a954  # frozen: v0.1.96
+    hooks:
+      - id: rumdl
+        args: [--disable, "MD013,MD052,MD036,MD046,MD024,MD049"]
+
+  ##################################
+  # YAML
+  ##################################
+  - repo: https://github.com/google/yamlfmt
+    rev: 21ca5323a9c87ee37a434e0ca908efc0a89daa07  # frozen: v0.21.0
+    hooks:
+      - id: yamlfmt
+
+  ##################################
+  # DEPENDENCY MANAGEMENT
+  ##################################
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.7.12
+    hooks:
+      - id: uv-lock

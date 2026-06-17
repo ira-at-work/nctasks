@@ -1,0 +1,25 @@
+[project]
+name = "nctasks"
+version = "0.1.0"
+description = "Interactive TUI for managing NanoClaw scheduled tasks"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = [
+    "textual>=0.80.0",
+    "croniter>=2.0.0",
+]
+
+[project.scripts]
+nctasks = "nctasks.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nctasks"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.0.0",
+]

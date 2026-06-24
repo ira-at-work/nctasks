@@ -111,3 +111,124 @@ def list_tasks(data_dir: Path, group_id: str) -> list[Task]:
         )
     )
     return tasks
+
+
+def _inbound_db(data_dir: Path, group_id: str, session_id: str) -> Path:
+    return data_dir / "v2-sessions" / group_id / session_id / "inbound.db"
+
+
+def cancel_task(
+    data_dir: Path, group_id: str, session_id: str, series_id: str
+) -> int:
+    """Mark a task (and all its recurring siblings) as completed."""
+    conn = sqlite3.connect(_inbound_db(data_dir, group_id, session_id))
+    try:
+        cur = conn.execute(
+            "UPDATE messages_in SET status = 'completed', recurrence = NULL "
+            "WHERE (id = ? OR series_id = ?) AND kind = 'task' "
+            "AND status IN ('pending', 'paused')",
+            (series_id, series_id),
+        )
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
+
+
+def pause_task(
+    data_dir: Path, group_id: str, session_id: str, series_id: str
+) -> int:
+    """Pause a pending task."""
+    conn = sqlite3.connect(_inbound_db(data_dir, group_id, session_id))
+    cur = conn.execute(
+        "UPDATE messages_in SET status = 'paused' "
+        "WHERE (id = ? OR series_id = ?) AND kind = 'task' AND status = 'pending'",
+        (series_id, series_id),
+    )
+    conn.commit()
+    conn.close()
+    return cur.rowcount
+
+
+def resume_task(
+    data_dir: Path, group_id: str, session_id: str, series_id: str
+) -> int:
+    """Resume a paused task."""
+    conn = sqlite3.connect(_inbound_db(data_dir, group_id, session_id))
+    cur = conn.execute(
+        "UPDATE messages_in SET status = 'pending' "
+        "WHERE (id = ? OR series_id = ?) AND kind = 'task' AND status = 'paused'",
+        (series_id, series_id),
+    )
+    conn.commit()
+    conn.close()
+    return cur.rowcount
+
+
+def update_task(
+    data_dir: Path,
+    group_id: str,
+    session_id: str,
+    series_id: str,
+    prompt: str,
+    script: str | None,
+    process_after: str,
+    recurrence: str | None,
+) -> int:
+    """Update prompt, script, schedule, and recurrence for a task."""
+    db_path = _inbound_db(data_dir, group_id, session_id)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT id, content FROM messages_in "
+        "WHERE (id = ? OR series_id = ?) AND kind = 'task' "
+        "AND status IN ('pending', 'paused')",
+        (series_id, series_id),
+    ).fetchall()
+
+    total = 0
+    for row in rows:
+        try:
+            content = json.loads(row["content"])
+        except (json.JSONDecodeError, TypeError):
+            content = {}
+        content["prompt"] = prompt
+        content["script"] = script
+        cur = conn.execute(
+            "UPDATE messages_in SET content = ?, process_after = ?, recurrence = ? "
+            "WHERE id = ?",
+            (json.dumps(content), process_after, recurrence, row["id"]),
+        )
+        total += cur.rowcount
+
+    conn.commit()
+    conn.close()
+    return total
+
+
+def get_task_snapshot(
+    data_dir: Path, group_id: str, session_id: str, series_id: str
+) -> dict | None:
+    """Return current (content, process_after, recurrence) for conflict detection."""
+    db_path = _inbound_db(data_dir, group_id, session_id)
+    if not db_path.exists():
+        return None
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT content, process_after, recurrence FROM messages_in "
+            "WHERE (id = ? OR series_id = ?) AND kind = 'task' "
+            "AND status IN ('pending', 'paused') "
+            "ORDER BY seq DESC LIMIT 1",
+            (series_id, series_id),
+        ).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        return None
+    return {
+        "content": row["content"],
+        "process_after": row["process_after"],
+        "recurrence": row["recurrence"],
+    }

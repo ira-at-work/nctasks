@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from nctasks.db import list_groups, list_tasks
+from nctasks.db import cancel_task, get_task_snapshot, list_groups, list_tasks, pause_task, resume_task, update_task
 
 
 @pytest.fixture()
@@ -127,3 +127,69 @@ def test_list_tasks_missing_sessions_dir(tmp_path: Path) -> None:
     conn.commit()
     conn.close()
     assert list_tasks(tmp_path, "ag-empty") == []
+
+
+def test_cancel_task(data_dir: Path) -> None:
+    """cancel_task marks the task completed with recurrence cleared."""
+    cancel_task(data_dir, "ag-test-001", "sess-test-001", "task-001")
+    tasks = list_tasks(data_dir, "ag-test-001")
+    assert not any(t.series_id == "task-001" for t in tasks)
+
+
+def test_pause_task(data_dir: Path) -> None:
+    """pause_task changes status from pending to paused."""
+    pause_task(data_dir, "ag-test-001", "sess-test-001", "task-001")
+    tasks = list_tasks(data_dir, "ag-test-001")
+    task = next(t for t in tasks if t.series_id == "task-001")
+    assert task.status == "paused"
+
+
+def test_resume_task(data_dir: Path) -> None:
+    """resume_task changes status from paused to pending."""
+    resume_task(data_dir, "ag-test-001", "sess-test-001", "task-002")
+    tasks = list_tasks(data_dir, "ag-test-001")
+    task = next(t for t in tasks if t.series_id == "task-002")
+    assert task.status == "pending"
+
+
+def test_update_task_prompt(data_dir: Path) -> None:
+    """update_task changes prompt while preserving other content fields."""
+    update_task(
+        data_dir, "ag-test-001", "sess-test-001", "task-001",
+        prompt="Updated prompt",
+        script=None,
+        process_after="2026-06-25T06:00:00.000Z",
+        recurrence="0 9 * * 1-5",
+    )
+    tasks = list_tasks(data_dir, "ag-test-001")
+    task = next(t for t in tasks if t.series_id == "task-001")
+    assert task.prompt == "Updated prompt"
+
+
+def test_update_task_clears_recurrence(data_dir: Path) -> None:
+    """update_task with recurrence=None removes the recurrence."""
+    update_task(
+        data_dir, "ag-test-001", "sess-test-001", "task-001",
+        prompt="Morning task",
+        script=None,
+        process_after="2026-06-25T06:00:00.000Z",
+        recurrence=None,
+    )
+    tasks = list_tasks(data_dir, "ag-test-001")
+    task = next(t for t in tasks if t.series_id == "task-001")
+    assert task.recurrence is None
+
+
+def test_get_task_snapshot(data_dir: Path) -> None:
+    """get_task_snapshot returns the current DB state for conflict detection."""
+    snap = get_task_snapshot(data_dir, "ag-test-001", "sess-test-001", "task-001")
+    assert snap is not None
+    assert snap["process_after"] == "2026-06-25T06:00:00.000Z"
+    assert snap["recurrence"] == "0 9 * * 1-5"
+    assert "Morning task" in snap["content"]
+
+
+def test_get_task_snapshot_missing(data_dir: Path) -> None:
+    """get_task_snapshot returns None for a non-existent task."""
+    snap = get_task_snapshot(data_dir, "ag-test-001", "sess-test-001", "task-nonexistent")
+    assert snap is None

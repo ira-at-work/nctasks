@@ -1,9 +1,9 @@
 """Tests for editor.py — render/parse round-trips and conflict detection."""
 
+import pytest
+
 from nctasks.db import Task
 from nctasks.editor import (
-    ParsedEdit,
-    Snapshot,
     has_conflict,
     make_snapshot,
     parse_edit_file,
@@ -12,17 +12,17 @@ from nctasks.editor import (
 
 
 def _make_task(**kwargs) -> Task:
-    defaults = dict(
-        series_id="task-1750000000-abc123",
-        session_id="sess-1750000000-xyz",
-        status="pending",
-        process_after="2026-06-18T06:00:00.000Z",
-        recurrence="0 9 * * 1-5",
-        prompt="Do the morning checks.",
-        script=None,
-        task_type="agent",
-        raw_content='{"prompt": "Do the morning checks.", "script": null}',
-    )
+    defaults = {
+        "series_id": "task-1750000000-abc123",
+        "session_id": "sess-1750000000-xyz",
+        "status": "pending",
+        "process_after": "2026-06-18T06:00:00.000Z",
+        "recurrence": "0 9 * * 1-5",
+        "prompt": "Do the morning checks.",
+        "script": None,
+        "task_type": "agent",
+        "raw_content": '{"prompt": "Do the morning checks.", "script": null}',
+    }
     defaults.update(kwargs)
     return Task(**defaults)
 
@@ -126,7 +126,6 @@ Hello
 
 
 def test_parse_missing_front_matter_raises() -> None:
-    import pytest
     with pytest.raises(ValueError, match="front-matter"):
         parse_edit_file("## Prompt\n\nno front matter here\n")
 
@@ -137,18 +136,30 @@ def test_parse_missing_front_matter_raises() -> None:
 def test_has_conflict_no_change() -> None:
     raw = '{"prompt": "hello", "script": null}'
     snap = make_snapshot(raw, "2026-06-18T06:00:00.000Z", "0 9 * * 1-5")
-    current = {"content": raw, "process_after": "2026-06-18T06:00:00.000Z", "recurrence": "0 9 * * 1-5"}
+    current = {
+        "content": raw,
+        "process_after": "2026-06-18T06:00:00.000Z",
+        "recurrence": "0 9 * * 1-5",
+    }
     assert not has_conflict(snap, current)
 
 
 def test_has_conflict_content_changed() -> None:
     snap = make_snapshot('{"prompt": "old"}', "2026-06-18T06:00:00.000Z", None)
-    current = {"content": '{"prompt": "new"}', "process_after": "2026-06-18T06:00:00.000Z", "recurrence": None}
+    current = {
+        "content": '{"prompt": "new"}',
+        "process_after": "2026-06-18T06:00:00.000Z",
+        "recurrence": None,
+    }
     assert has_conflict(snap, current)
 
 
 def test_has_conflict_schedule_changed() -> None:
     raw = '{"prompt": "hello"}'
     snap = make_snapshot(raw, "2026-06-18T06:00:00.000Z", "0 9 * * 1-5")
-    current = {"content": raw, "process_after": "2026-06-19T06:00:00.000Z", "recurrence": "0 9 * * 1-5"}
+    current = {
+        "content": raw,
+        "process_after": "2026-06-19T06:00:00.000Z",
+        "recurrence": "0 9 * * 1-5",
+    }
     assert has_conflict(snap, current)

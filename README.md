@@ -49,6 +49,15 @@ nctasks --data-dir /path/to/nanoclaw/data
 | `r` | Reload tasks from DB |
 | `Esc` / `q` | Back / quit |
 
+### Conflict screen
+
+Shown when the DB changed while the editor was open.
+
+| Key | Action |
+|-----|--------|
+| `o` | Overwrite DB with your edits |
+| `Esc` / `q` | Discard your edits, keep DB state |
+
 ## Task modes
 
 NanoClaw supports three task modes. When you edit a task with `e`, the full task

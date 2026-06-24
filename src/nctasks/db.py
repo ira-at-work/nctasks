@@ -1,4 +1,4 @@
-"""NanoClaw SQLite access — read groups/tasks, write mutations."""
+"""NanoClaw SQLite access — read groups and tasks (write mutations added in Task 2)."""
 
 from __future__ import annotations
 
@@ -36,12 +36,14 @@ def list_groups(data_dir: Path) -> list[AgentGroup]:
     """Return all agent groups from v2.db, ordered by name."""
     db_path = data_dir / "v2.db"
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(
-        "SELECT id, name, folder FROM agent_groups ORDER BY name"
-    ).fetchall()
-    conn.close()
-    return [AgentGroup(id=r["id"], name=r["name"], folder=r["folder"]) for r in rows]
+    try:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT id, name, folder FROM agent_groups ORDER BY name"
+        ).fetchall()
+        return [AgentGroup(id=r["id"], name=r["name"], folder=r["folder"]) for r in rows]
+    finally:
+        conn.close()
 
 
 def list_tasks(data_dir: Path, group_id: str) -> list[Task]:
@@ -62,11 +64,15 @@ def list_tasks(data_dir: Path, group_id: str) -> list[Task]:
             conn = sqlite3.connect(f"file:{inbound_db}?mode=ro", uri=True)
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
-                """SELECT series_id, status, process_after, recurrence, content,
-                          MAX(seq) AS _seq
-                   FROM messages_in
-                   WHERE kind = 'task' AND status IN ('pending', 'paused')
-                   GROUP BY series_id"""
+                """SELECT m.series_id, m.status, m.process_after, m.recurrence, m.content
+                   FROM messages_in m
+                   INNER JOIN (
+                       SELECT series_id, MAX(seq) AS max_seq
+                       FROM messages_in
+                       WHERE kind = 'task'
+                       GROUP BY series_id
+                   ) latest ON m.series_id = latest.series_id AND m.seq = latest.max_seq
+                   WHERE m.kind = 'task' AND m.status IN ('pending', 'paused')"""
             ).fetchall()
             conn.close()
         except sqlite3.Error:

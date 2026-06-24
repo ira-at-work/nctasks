@@ -1,12 +1,11 @@
 """Tests for db.py — uses real temporary SQLite files."""
 import json
 import sqlite3
-import tempfile
 from pathlib import Path
 
 import pytest
 
-from nctasks.db import AgentGroup, Task, list_groups, list_tasks
+from nctasks.db import list_groups, list_tasks
 
 
 @pytest.fixture()
@@ -63,6 +62,19 @@ def data_dir(tmp_path: Path) -> Path:
             "task-002",
         ),
     )
+    conn.execute(
+        """INSERT INTO messages_in
+           (id, seq, kind, timestamp, status, process_after, recurrence, content, series_id)
+           VALUES (?, ?, 'task', datetime('now'), 'pending', ?, ?, ?, ?)""",
+        (
+            "task-003",
+            6,
+            None,
+            None,
+            json.dumps({"prompt": "No-schedule task", "script": None}),
+            "task-003",
+        ),
+    )
     conn.commit()
     conn.close()
 
@@ -80,15 +92,18 @@ def test_list_groups(data_dir: Path) -> None:
 def test_list_tasks_returns_both_statuses(data_dir: Path) -> None:
     """list_tasks returns pending AND paused tasks."""
     tasks = list_tasks(data_dir, "ag-test-001")
-    assert len(tasks) == 2
+    assert len(tasks) == 3
 
 
 def test_list_tasks_ordered_by_process_after(data_dir: Path) -> None:
     """Tasks are ordered process_after ASC; None sorts last."""
     tasks = list_tasks(data_dir, "ag-test-001")
-    # task-001 has earlier process_after; task-002 has None (sorts last)
+    # task-001 has the earliest process_after; task-002 has a later date;
+    # task-003 has process_after=None and must sort last
     assert tasks[0].series_id == "task-001"
     assert tasks[1].series_id == "task-002"
+    assert tasks[2].series_id == "task-003"
+    assert tasks[2].process_after is None
 
 
 def test_list_tasks_type_detection(data_dir: Path) -> None:

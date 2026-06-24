@@ -98,7 +98,20 @@ Triggered by `Enter` / `e` on a task row. This is not a Textual screen — it su
 7. **Parse and write** — parse the edited file (see format below), write back to the `inbound.db` that owns the task.
 8. **Cleanup** — delete the temp file.
 
+### Task modes
+
+A task's behaviour is determined by the combination of `## Prompt` and `## Script` in the edit file:
+
+| Mode | Script section | Script output | Result |
+|------|---------------|---------------|--------|
+| **Agent** | empty / absent | — | Agent is woken with the prompt |
+| **Script → agent** | present | `{"wakeAgent": true, "data": {...}}` | Script runs; agent is woken with prompt + `data` injected as context |
+| **Script → send** | present | `{"wakeAgent": false, "send": "..."}` | Script runs; message sent to channel; agent not woken. If a human replies, the agent wakes normally. |
+| **Script silent** | present | `{"wakeAgent": false}` | Script runs; nothing sent; no agent |
+
 ### Edit file format
+
+The edit file contains the **full, untruncated** content of the task. Every field is editable except `id` and `session_id`, which are read-only metadata used to locate the DB row.
 
 ```markdown
 <!-- nctasks edit file — keep the front-matter block intact -->
@@ -111,24 +124,38 @@ recurrence: 0 9 * * 1-5
 
 ## Prompt
 
-Write task instructions here.
+Full task instructions for the agent. This text is always present — even for
+script-only tasks it serves as human-readable documentation of what the task does.
 
 ## Script
 
 ```sh
-# Optional pre-agent script.
-# Delete the code block content (leave the section header) to clear the script.
-echo '{"wakeAgent": true}'
+# Mode: Agent (no script)
+#   Leave this code block empty (or delete its contents).
+#
+# Mode: Script → agent (wakeAgent: true)
+#   Script must print a JSON object as its last line: {"wakeAgent": true, "data": {...}}
+#   The "data" value is injected into the agent's context alongside the prompt.
+#
+# Mode: Script → send (wakeAgent: false)
+#   Script must print: {"wakeAgent": false, "send": "message text"}
+#   The "send" text is posted to the session channel; no agent is woken.
+#   If a human replies to that message, the agent wakes normally.
+#
+# Mode: Script silent
+#   Script must print: {"wakeAgent": false}
+
+echo '{"wakeAgent": true, "data": {}}'
 ```
 ```
 
 **Parse rules:**
 
-- Front-matter is YAML between the first `---` pair; `id` and `session_id` are read-only metadata (not written back).
-- `process_after` — displayed and edited in the user's system local time (naive, no offset). Written back to the DB as UTC ISO 8601, matching NanoClaw's storage convention. Accepts either naive local (`2026-06-18T09:00:00`) or explicit UTC (`2026-06-18T06:00:00Z`).
+- Front-matter is YAML between the first `---` pair; `id` and `session_id` are read-only (not written back).
+- `process_after` — displayed and edited in the user's system local time (naive, no offset). Written back to the DB as UTC ISO 8601. Accepts either naive local (`2026-06-18T09:00:00`) or explicit UTC (`2026-06-18T06:00:00Z`).
 - `recurrence` — cron expression string; empty value clears recurrence (makes task one-shot).
-- `## Prompt` section body (trimmed) → `content.prompt`.
-- `## Script` fenced code block content (trimmed) → `content.script`; empty or absent block → `null`.
+- `## Prompt` section body (whitespace-stripped, full content preserved) → `content.prompt`.
+- `## Script` fenced code block content (whitespace-stripped) → `content.script`; empty or absent block → `null`.
 
 ### Write-back SQL
 

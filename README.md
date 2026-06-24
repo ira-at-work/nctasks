@@ -110,7 +110,6 @@ and open PRs. Report to signal-group when done.
 issues=$(gh api repos/Agrematch/agrematch/issues?state=open --jq '[.[] | {number,title}]')
 echo "{\"wakeAgent\": true, \"data\": {\"issues\": $issues}}"
 ```
-```
 
 The `data` value is available to the agent as `scriptOutput` in the prompt context.
 
@@ -155,7 +154,6 @@ if status == "DOWN":
 else:
     print(json.dumps({"wakeAgent": False}))
 ```
-```
 
 **Script output rules:**
 
@@ -185,7 +183,6 @@ Full prompt text (not truncated).
 
 ```sh
 # Script content. Empty block = no script (Mode 1).
-```
 ```
 
 `process_after` and `recurrence` are written back to the DB on save. `id` and

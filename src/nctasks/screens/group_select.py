@@ -39,7 +39,7 @@ class GroupSelectScreen(Screen):
         table.focus()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        from .task_list import TaskListScreen
+        from .task_list import TaskListScreen  # noqa: PLC0415
 
         group_id = str(event.row_key.value)
         group = next((g for g in self._groups if g.id == group_id), None)

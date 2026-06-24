@@ -25,8 +25,8 @@ class NcTasksApp(App):
 
     def on_mount(self) -> None:
         if self.initial_group is not None:
-            from .screens.task_list import TaskListScreen
+            from .screens.task_list import TaskListScreen  # noqa: PLC0415
             self.push_screen(TaskListScreen(self.data_dir, self.initial_group))
         else:
-            from .screens.group_select import GroupSelectScreen
+            from .screens.group_select import GroupSelectScreen  # noqa: PLC0415
             self.push_screen(GroupSelectScreen(self.data_dir))

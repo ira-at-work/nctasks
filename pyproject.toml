@@ -22,4 +22,5 @@ packages = ["src/nctasks"]
 [dependency-groups]
 dev = [
     "pre-commit>=4.0.0",
+    "pytest>=9.1.1",
 ]

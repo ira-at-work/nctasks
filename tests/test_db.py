@@ -5,7 +5,15 @@ from pathlib import Path
 
 import pytest
 
-from nctasks.db import cancel_task, get_task_snapshot, list_groups, list_tasks, pause_task, resume_task, update_task
+from nctasks.db import (
+    cancel_task,
+    get_task_snapshot,
+    list_groups,
+    list_tasks,
+    pause_task,
+    resume_task,
+    update_task,
+)
 
 
 @pytest.fixture()
@@ -164,6 +172,7 @@ def test_update_task_prompt(data_dir: Path) -> None:
     tasks = list_tasks(data_dir, "ag-test-001")
     task = next(t for t in tasks if t.series_id == "task-001")
     assert task.prompt == "Updated prompt"
+    assert task.script is None  # original value preserved
 
 
 def test_update_task_clears_recurrence(data_dir: Path) -> None:

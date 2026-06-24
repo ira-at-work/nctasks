@@ -140,14 +140,16 @@ def pause_task(
 ) -> int:
     """Pause a pending task."""
     conn = sqlite3.connect(_inbound_db(data_dir, group_id, session_id))
-    cur = conn.execute(
-        "UPDATE messages_in SET status = 'paused' "
-        "WHERE (id = ? OR series_id = ?) AND kind = 'task' AND status = 'pending'",
-        (series_id, series_id),
-    )
-    conn.commit()
-    conn.close()
-    return cur.rowcount
+    try:
+        cur = conn.execute(
+            "UPDATE messages_in SET status = 'paused' "
+            "WHERE (id = ? OR series_id = ?) AND kind = 'task' AND status = 'pending'",
+            (series_id, series_id),
+        )
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
 
 
 def resume_task(
@@ -155,14 +157,16 @@ def resume_task(
 ) -> int:
     """Resume a paused task."""
     conn = sqlite3.connect(_inbound_db(data_dir, group_id, session_id))
-    cur = conn.execute(
-        "UPDATE messages_in SET status = 'pending' "
-        "WHERE (id = ? OR series_id = ?) AND kind = 'task' AND status = 'paused'",
-        (series_id, series_id),
-    )
-    conn.commit()
-    conn.close()
-    return cur.rowcount
+    try:
+        cur = conn.execute(
+            "UPDATE messages_in SET status = 'pending' "
+            "WHERE (id = ? OR series_id = ?) AND kind = 'task' AND status = 'paused'",
+            (series_id, series_id),
+        )
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
 
 
 def update_task(
@@ -178,32 +182,34 @@ def update_task(
     """Update prompt, script, schedule, and recurrence for a task."""
     db_path = _inbound_db(data_dir, group_id, session_id)
     conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(
-        "SELECT id, content FROM messages_in "
-        "WHERE (id = ? OR series_id = ?) AND kind = 'task' "
-        "AND status IN ('pending', 'paused')",
-        (series_id, series_id),
-    ).fetchall()
+    try:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT id, content FROM messages_in "
+            "WHERE (id = ? OR series_id = ?) AND kind = 'task' "
+            "AND status IN ('pending', 'paused')",
+            (series_id, series_id),
+        ).fetchall()
 
-    total = 0
-    for row in rows:
-        try:
-            content = json.loads(row["content"])
-        except (json.JSONDecodeError, TypeError):
-            content = {}
-        content["prompt"] = prompt
-        content["script"] = script
-        cur = conn.execute(
-            "UPDATE messages_in SET content = ?, process_after = ?, recurrence = ? "
-            "WHERE id = ?",
-            (json.dumps(content), process_after, recurrence, row["id"]),
-        )
-        total += cur.rowcount
+        total = 0
+        for row in rows:
+            try:
+                content = json.loads(row["content"])
+            except (json.JSONDecodeError, TypeError):
+                content = {}
+            content["prompt"] = prompt
+            content["script"] = script
+            cur = conn.execute(
+                "UPDATE messages_in SET content = ?, process_after = ?, recurrence = ? "
+                "WHERE id = ?",
+                (json.dumps(content), process_after, recurrence, row["id"]),
+            )
+            total += cur.rowcount
 
-    conn.commit()
-    conn.close()
-    return total
+        conn.commit()
+        return total
+    finally:
+        conn.close()
 
 
 def get_task_snapshot(

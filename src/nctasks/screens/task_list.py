@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import subprocess
+import textwrap
 from datetime import datetime
 from pathlib import Path
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Grid
+from textual.containers import Vertical
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, DataTable, Footer, Header, Label
+from textual.widgets import DataTable, Footer, Header, Label, RadioButton, RadioSet
 
 from ..db import (
     AgentGroup,
@@ -38,33 +40,24 @@ class ConfirmDeleteModal(ModalScreen[bool]):
     ConfirmDeleteModal {
         align: center middle;
     }
-    ConfirmDeleteModal > Grid {
-        grid-size: 2;
-        grid-gutter: 1 2;
+    ConfirmDeleteModal > Vertical {
         padding: 1 2;
         width: 50;
-        height: 9;
+        height: auto;
         border: thick $background 80%;
         background: $surface;
     }
     ConfirmDeleteModal Label {
-        column-span: 2;
-        height: 1fr;
         width: 1fr;
         content-align: center middle;
-    }
-    ConfirmDeleteModal Button {
-        opacity: 60%;
-    }
-    ConfirmDeleteModal Button:focus {
-        opacity: 100%;
-        text-style: bold reverse;
+        padding-bottom: 1;
     }
     """
 
     BINDINGS = [
-        Binding("y,enter", "confirm", "Yes — delete"),
-        Binding("n,escape", "cancel", "No — keep"),
+        Binding("enter", "submit", "OK", priority=True),
+        Binding("y", "yes", "Yes — delete"),
+        Binding("n,escape", "no", "No — keep"),
     ]
 
     def __init__(self, task_id_short: str) -> None:
@@ -72,29 +65,26 @@ class ConfirmDeleteModal(ModalScreen[bool]):
         self.task_id_short = task_id_short
 
     def compose(self) -> ComposeResult:
-        with Grid():
+        with Vertical():
             yield Label(f"Delete task …{self.task_id_short}?")
-            yield Button("Yes (y)", variant="error", id="btn-yes")
-            yield Button("No (n)", variant="primary", id="btn-no")
+            with RadioSet(id="choice"):
+                yield RadioButton("No — keep", value=True)
+                yield RadioButton("Yes — delete")
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        self.dismiss(event.button.id == "btn-yes")
+    def action_submit(self) -> None:
+        self.dismiss(self.query_one(RadioSet).pressed_index == 1)
 
-    def action_confirm(self) -> None:
+    def action_yes(self) -> None:
         self.dismiss(True)
 
-    def action_cancel(self) -> None:
+    def action_no(self) -> None:
         self.dismiss(False)
 
 
 def _fmt_prompt(prompt: str, width: int = 80) -> str:
-    lines = prompt.splitlines()
-    if not lines:
-        return ""
-    first = lines[0][:width]
-    if len(lines) >= 2 and lines[1].strip():
-        return f"{first}\n{lines[1][:width]}"
-    return first
+    flat = " ".join(prompt.split())
+    wrapped = textwrap.wrap(flat, width=width, max_lines=2, placeholder="…")
+    return "\n".join(wrapped) if wrapped else ""
 
 
 def _fmt_local(utc_str: str | None) -> str:
@@ -111,7 +101,8 @@ class TaskListScreen(Screen):
     """Task list for one agent group — the main working view."""
 
     BINDINGS = [
-        Binding("e,enter", "edit", "Edit"),
+        Binding("enter", "view", "View"),
+        Binding("e", "edit", "Edit"),
         Binding("d,delete", "delete", "Delete"),
         Binding("p", "pause_resume", "Pause/Resume"),
         Binding("r", "reload", "Reload"),
@@ -166,10 +157,22 @@ class TaskListScreen(Screen):
         self.notify("Reloaded.")
 
     def action_back(self) -> None:
-        self.app.pop_screen()
+        if len(self.app.screen_stack) > 1:
+            self.app.pop_screen()
+        else:
+            self.app.exit()
 
     def action_quit_app(self) -> None:
         self.app.exit()
+
+    def action_view(self) -> None:
+        task = self._selected_task()
+        if task is None:
+            return
+        tmp = write_temp_file(render_edit_file(task))
+        with self.app.suspend():
+            subprocess.run(["less", str(tmp)], check=False)
+        tmp.unlink(missing_ok=True)
 
     def action_pause_resume(self) -> None:
         task = self._selected_task()

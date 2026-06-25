@@ -54,11 +54,11 @@ class ConfirmDeleteModal(ModalScreen[bool]):
         content-align: center middle;
     }
     ConfirmDeleteModal Button {
-        opacity: 50%;
+        opacity: 60%;
     }
     ConfirmDeleteModal Button:focus {
         opacity: 100%;
-        text-style: bold;
+        text-style: bold reverse;
     }
     """
 
@@ -75,7 +75,7 @@ class ConfirmDeleteModal(ModalScreen[bool]):
         with Grid():
             yield Label(f"Delete task …{self.task_id_short}?")
             yield Button("Yes (y)", variant="error", id="btn-yes")
-            yield Button("No (n)", variant="default", id="btn-no")
+            yield Button("No (n)", variant="primary", id="btn-no")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss(event.button.id == "btn-yes")
@@ -149,6 +149,7 @@ class TaskListScreen(Screen):
                 task.session_id[-6:],
                 _fmt_prompt(task.prompt),
                 key=task.series_id,
+                height=None,
             )
         if not self._tasks:
             self.notify("No pending or paused tasks.", severity="information")

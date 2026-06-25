@@ -53,6 +53,13 @@ class ConfirmDeleteModal(ModalScreen[bool]):
         width: 1fr;
         content-align: center middle;
     }
+    ConfirmDeleteModal Button {
+        opacity: 50%;
+    }
+    ConfirmDeleteModal Button:focus {
+        opacity: 100%;
+        text-style: bold;
+    }
     """
 
     BINDINGS = [
@@ -68,7 +75,7 @@ class ConfirmDeleteModal(ModalScreen[bool]):
         with Grid():
             yield Label(f"Delete task …{self.task_id_short}?")
             yield Button("Yes (y)", variant="error", id="btn-yes")
-            yield Button("No (n)", variant="primary", id="btn-no")
+            yield Button("No (n)", variant="default", id="btn-no")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss(event.button.id == "btn-yes")
@@ -78,6 +85,16 @@ class ConfirmDeleteModal(ModalScreen[bool]):
 
     def action_cancel(self) -> None:
         self.dismiss(False)
+
+
+def _fmt_prompt(prompt: str, width: int = 80) -> str:
+    lines = prompt.splitlines()
+    if not lines:
+        return ""
+    first = lines[0][:width]
+    if len(lines) >= 2 and lines[1].strip():
+        return f"{first}\n{lines[1][:width]}"
+    return first
 
 
 def _fmt_local(utc_str: str | None) -> str:
@@ -98,7 +115,8 @@ class TaskListScreen(Screen):
         Binding("d,delete", "delete", "Delete"),
         Binding("p", "pause_resume", "Pause/Resume"),
         Binding("r", "reload", "Reload"),
-        Binding("escape,q", "back", "Back"),
+        Binding("escape", "back", "Back"),
+        Binding("q", "quit_app", "Quit"),
     ]
 
     def __init__(self, data_dir: Path, group: AgentGroup) -> None:
@@ -129,7 +147,7 @@ class TaskListScreen(Screen):
                 _fmt_local(task.process_after),
                 task.recurrence or "—",
                 task.session_id[-6:],
-                task.prompt[:80].replace("\n", " "),
+                _fmt_prompt(task.prompt),
                 key=task.series_id,
             )
         if not self._tasks:
@@ -148,6 +166,9 @@ class TaskListScreen(Screen):
 
     def action_back(self) -> None:
         self.app.pop_screen()
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def action_pause_resume(self) -> None:
         task = self._selected_task()
@@ -191,6 +212,8 @@ class TaskListScreen(Screen):
         with self.app.suspend():
             open_editor(tmp)
 
+        self._load_tasks()
+
         try:
             edited_text = tmp.read_text()
             parsed = parse_edit_file(edited_text)
@@ -222,8 +245,7 @@ class TaskListScreen(Screen):
             self._apply_edit(task, parsed)
 
     def _on_conflict_resolved(self, overwrite: bool) -> None:
-        if overwrite:
-            self._load_tasks()
+        self._load_tasks()
 
     def _apply_edit(self, task: Task, parsed) -> None:
         update_task(

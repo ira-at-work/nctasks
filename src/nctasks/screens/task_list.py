@@ -101,7 +101,7 @@ class TaskListScreen(Screen):
     """Task list for one agent group — the main working view."""
 
     BINDINGS = [
-        Binding("enter", "view", "View"),
+        Binding("enter,space,v", "view", "View", priority=True),
         Binding("e", "edit", "Edit"),
         Binding("d,delete", "delete", "Delete"),
         Binding("p", "pause_resume", "Pause/Resume"),
@@ -157,7 +157,9 @@ class TaskListScreen(Screen):
         self.notify("Reloaded.")
 
     def action_back(self) -> None:
-        if len(self.app.screen_stack) > 1:
+        # screen_stack always has the default Screen(_default) at index 0,
+        # so > 2 means there is a real predecessor (e.g. GroupSelectScreen).
+        if len(self.app.screen_stack) > 2:
             self.app.pop_screen()
         else:
             self.app.exit()
